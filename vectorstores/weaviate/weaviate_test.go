@@ -545,3 +545,45 @@ func TestWeaviateAsRetrieverWithMetadataFilters(t *testing.T) {
 	require.NotContains(t, result, "orange", "expected not orange in result")
 	require.NotContains(t, result, "yellow", "expected not yellow in result")
 }
+
+func TestWeaviateStoreDefaultAdditionalFields(t *testing.T) {
+	t.Parallel()
+
+	scheme, host := getValues(t)
+
+	llm, err := openai.New()
+	require.NoError(t, err)
+	e, err := embeddings.NewEmbedder(llm)
+	require.NoError(t, err)
+
+	store, err := New(
+		WithScheme(scheme),
+		WithHost(host),
+		WithEmbedder(e),
+		WithNameSpace(uuid.New().String()),
+		WithIndexName(randomizedCamelCaseClass()),
+	)
+	require.NoError(t, err)
+
+	err = createTestClass(context.Background(), store)
+	require.NoError(t, err)
+
+	_, err = store.AddDocuments(context.Background(), []schema.Document{
+		{PageContent: "Foo"},
+	})
+	require.NoError(t, err)
+
+	// Check if the default additional fields are present in the result
+	docs, err := store.SimilaritySearch(context.Background(),
+		"Foo", 1)
+	require.NoError(t, err)
+	require.Len(t, docs, 1)
+
+	additional, ok := docs[0].Metadata["_additional"].(map[string]any)
+	require.True(t, ok, "expected '_additional' to be present in the metadata and parsable as 'map[string]any'")
+
+	certainty, _ := additional["certainty"].(float64)
+	require.Equal(t, docs[0].Score, float32(certainty), "expect score to be equal to the certainty")
+
+	require.NotEmpty(t, additional["id"], "expected the id to be present in the '_additional' metadata field")
+}

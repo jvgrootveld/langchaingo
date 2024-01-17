@@ -276,6 +276,7 @@ func (s Store) createFields() []graphql.Field {
 	fields = append(fields, graphql.Field{
 		Name: "_additional",
 		Fields: []graphql.Field{
+			{Name: "id"},
 			{Name: "certainty"},
 		},
 	})
